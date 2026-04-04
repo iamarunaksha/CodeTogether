@@ -30,38 +30,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // ROUTES
 // ================================================
 
-/**
- * @openapi
- * /:
- *   get:
- *     summary: API root
- *     description: Returns a welcome message confirming the API is running
- *     tags:
- *       - General
- *     responses:
- *       200:
- *         description: API is healthy
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: CodeTogether API is running!
- *                 status:
- *                   type: string
- *                   example: healthy
- *                 timestamp:
- *                   type: string
- *                   example: 2026-04-05T00:00:00.000Z
- */
+// ROOT ROUTE — Redirect to Swagger docs
+// res.redirect() sends the browser to a different URL
+// So visiting localhost:3001 automatically opens the Swagger page
 app.get('/', (req, res) => {
-  res.json({
-    message: 'CodeTogether API is running!',
-    status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
+  res.redirect('/api-docs');
 });
 
 /**
