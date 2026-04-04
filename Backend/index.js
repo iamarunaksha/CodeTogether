@@ -3,50 +3,99 @@
 // ================================================
 
 // 1. IMPORT EXPRESS
-// "require" is Node.js's way of importing libraries
-// (similar to <script src="..."> in HTML, but for the server)
 const express = require('express');
 
-// 2. CREATE AN EXPRESS APPLICATION
-// express() returns an "app" object with methods like .get(), .post(), .listen()
-// Think of "app" as the web server
+// 2. IMPORT SWAGGER
+// swaggerUi provides the interactive webpage
+// swaggerSpec is the configuration we wrote in swagger.js
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
+
+// 3. CREATE AN EXPRESS APPLICATION
 const app = express();
 
-// 3. DEFINE A PORT
-// Port 3001 means: "listen for requests on door number 3001"
-// We use 3001 (not 3000) because React will use 3000
+// 4. DEFINE A PORT
 const PORT = 3001;
 
-// 4. MIDDLEWARE: Parse JSON requests
-// When the frontend sends data as JSON, Express needs to know how to read it
-// This line says "hey Express, if someone sends you JSON, parse it into a JS object"
+// 5. MIDDLEWARE: Parse JSON requests
 app.use(express.json());
 
-// 5. DEFINE A ROUTE
-// A "route" = a URL path + what to do when someone visits it
-// app.get('/path', handlerFunction) means:
-//   "When someone visits /path with a GET request, run this function"
-//
-// The function receives two parameters:
-//   req (request)  = info about the incoming request (who's asking, what they sent)
-//   res (response) = an object we use to send a response back
+// 6. MOUNT SWAGGER UI
+// This says: "When someone visits /api-docs, show them the Swagger UI"
+// swaggerUi.serve = the static files (CSS, JS) needed to render the page
+// swaggerUi.setup(swaggerSpec) = generate the page using our API spec
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ================================================
+// ROUTES
+// ================================================
+
+/**
+ * @openapi
+ * /:
+ *   get:
+ *     summary: API root
+ *     description: Returns a welcome message confirming the API is running
+ *     tags:
+ *       - General
+ *     responses:
+ *       200:
+ *         description: API is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: CodeTogether API is running!
+ *                 status:
+ *                   type: string
+ *                   example: healthy
+ *                 timestamp:
+ *                   type: string
+ *                   example: 2026-04-05T00:00:00.000Z
+ */
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'CodeTogether API is running!',
     status: 'healthy',
     timestamp: new Date().toISOString()
   });
 });
 
-// 6. A second route — this will be useful later for health checks
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     summary: Health check
+ *     description: Returns the server health status and uptime in seconds
+ *     tags:
+ *       - General
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 uptime:
+ *                   type: number
+ *                   example: 123.456
+ */
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// 7. START THE SERVER
-// app.listen() starts the server and keeps it running
-// It takes a port number and a callback function that runs once the server is ready
+// ================================================
+// START THE SERVER
+// ================================================
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`Swagger docs: http://localhost:${PORT}/api-docs`);
 });
