@@ -12,3 +12,6 @@ dist/
 
 # Editor config
 .vscode/
+
+# Vision document for building this application
+VS Code Multiple.docx
