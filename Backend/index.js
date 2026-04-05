@@ -1,38 +1,40 @@
 // ================================================
-// Backend/index.js — Express Backend
+// Backend/index.js — Express + Socket.IO Backend
 // ================================================
 
-// 1. IMPORT EXPRESS
+// 1. IMPORTS
 const express = require('express');
-
-// 2. IMPORT SWAGGER
-// swaggerUi provides the interactive webpage
-// swaggerSpec is the configuration we wrote in swagger.js
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 
-// 3. CREATE AN EXPRESS APPLICATION
+// 2. CREATE EXPRESS APP
 const app = express();
 
-// 4. DEFINE A PORT
+// 3. CREATE HTTP SERVER
+// Express alone only handles HTTP. To add WebSockets, we need the raw
+// HTTP server that Express sits on top of.
+const httpServer = createServer(app);
+
+// 4. CREATE SOCKET.IO SERVER
+const io = new Server(httpServer, {
+  cors: {
+    origin: 'http://localhost:5173', // Allow connections from React
+    methods: ['GET', 'POST'],
+  },
+});
+
 const PORT = 3001;
 
-// 5. MIDDLEWARE: Parse JSON requests
+// 5. MIDDLEWARE
 app.use(express.json());
-
-// 6. MOUNT SWAGGER UI
-// This says: "When someone visits /api-docs, show them the Swagger UI"
-// swaggerUi.serve = the static files (CSS, JS) needed to render the page
-// swaggerUi.setup(swaggerSpec) = generate the page using our API spec
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ================================================
-// ROUTES
+// HTTP ROUTES
 // ================================================
 
-// ROOT ROUTE — Redirect to Swagger docs
-// res.redirect() sends the browser to a different URL
-// So visiting localhost:3001 automatically opens the Swagger page
 app.get('/', (req, res) => {
   res.redirect('/api-docs');
 });
@@ -42,33 +44,42 @@ app.get('/', (req, res) => {
  * /api/health:
  *   get:
  *     summary: Health check
- *     description: Returns the server health status and uptime in seconds
+ *     description: Returns the server health status and uptime
  *     tags:
  *       - General
  *     responses:
  *       200:
  *         description: Server is healthy
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: ok
- *                 uptime:
- *                   type: number
- *                   example: 123.456
  */
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
 // ================================================
+// WEBSOCKET EVENTS
+// ================================================
+
+io.on('connection', (socket) => {
+  console.log(`User connected: ${socket.id}`);
+
+  // Listen for 'code-change' events from this client
+  socket.on('code-change', (data) => {
+    console.log(`Code change from ${socket.id}`);
+    // socket.broadcast.emit sends it to ALL OTHER clients except this one
+    socket.broadcast.emit('code-change', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`User disconnected: ${socket.id}`);
+  });
+});
+
+// ================================================
 // START THE SERVER
 // ================================================
-app.listen(PORT, () => {
+// We must use httpServer.listen() instead of app.listen()
+httpServer.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`Swagger docs: http://localhost:${PORT}/api-docs`);
+  console.log(`WebSocket server ready on port ${PORT}`);
 });
