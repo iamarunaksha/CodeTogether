@@ -1,99 +1,191 @@
-import { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+// ================================================
+// App.jsx — VS Code Layout Orchestrator
+// Now uses Yjs for real-time sync (replaces Socket.IO code-change)
+// ================================================
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { provider } from './lib/collaboration';
+
+// VS Code Shell Components
+import TitleBar from './Components/TitleBar';
+import ActivityBar from './Components/ActivityBar';
+import Sidebar from './Components/Sidebar';
+import TabBar from './Components/TabBar';
+import WelcomeTab from './Components/WelcomeTab';
+import StatusBar from './Components/StatusBar';
+import CodeEditor from './Components/CodeEditor';
+
+// Unique ID generator for tabs
+let tabIdCounter = 0;
+const createTabId = () => `tab-${++tabIdCounter}`;
 
 function App() {
+  // ---- Connection State ----
   const [backendStatus, setBackendStatus] = useState('checking');
-  const [socketStatus, setSocketStatus] = useState('disconnected');
-  const [text, setText] = useState('');
+  const [socketStatus, setSocketStatus] = useState(provider.wsconnected ? 'connected' : 'disconnected');
+  // socketStatus now tracks the YJS provider connection, not Socket.IO
 
-  // useRef stores values that persist across re-renders without causing a re-render.
-  // We want ONE connection, so we store it here.
-  const socketRef = useRef(null);
-  const isRemoteChange = useRef(false);
+  // ---- Editor State ----
+  // REMOVED: const [code, setCode] = useState(...)
+  //   → Yjs now owns the code content. No React state needed.
+  const [language, setLanguage] = useState('javascript');
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
 
+  // ---- UI Layout State ----
+  const [activePanel, setActivePanel] = useState('explorer');
+  const [tabs, setTabs] = useState([
+    { id: 'welcome', name: 'Welcome', type: 'welcome' },
+  ]);
+  const [activeTab, setActiveTab] = useState('welcome');
+
+  // ---- Yjs Provider Status ----
   useEffect(() => {
-    // ---- CHECK HTTP BACKEND ----
+    // Check HTTP backend health (same as before)
     fetch('/api/health')
       .then((res) => res.json())
       .then(() => setBackendStatus('connected'))
       .catch(() => setBackendStatus('disconnected'));
 
-    // ---- CONNECT TO WEBSOCKET ----
-    const socket = io('http://localhost:3001');
-    socketRef.current = socket;
+    // Track Yjs WebSocket provider connection status
+    // Ensure we capture the current state immediately (fixes React StrictMode race conditions)
+    setSocketStatus(provider.wsconnected ? 'connected' : 'disconnected');
+    
+    const handleStatus = ({ status }) => {
+      console.log('🔄 Yjs provider status:', status);
+      setSocketStatus(status === 'connected' ? 'connected' : 'disconnected');
+    };
 
-    socket.on('connect', () => {
-      console.log('🔌 WebSocket connected:', socket.id);
-      setSocketStatus('connected');
-    });
+    provider.on('status', handleStatus);
 
-    // Listen for code changes from OTHER users
-    socket.on('code-change', (data) => {
-      console.log('📨 Received code change');
-      isRemoteChange.current = true;   // Flag to prevent a loop
-      setText(data.content);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('🔌 WebSocket disconnected');
-      setSocketStatus('disconnected');
-    });
-
-    // Cleanup: disconnect when component unmounts
-    return () => socket.disconnect();
+    // Cleanup: remove listener when component unmounts
+    return () => {
+      provider.off('status', handleStatus);
+    };
   }, []);
 
-  const handleTextChange = (e) => {
-    const newText = e.target.value;
-    setText(newText);
+  // REMOVED: handleCodeChange, isRemoteChange ref, socketRef
+  //   → All handled by Yjs + MonacoBinding now
 
-    // Only emit to server if the USER typed it (not received from server)
-    if (!isRemoteChange.current) {
-      socketRef.current?.emit('code-change', { content: newText });
+  // ---- Tab Management (unchanged from Phase 3.5) ----
+  const openFile = useCallback((fileName) => {
+    const existingTab = tabs.find((t) => t.name === fileName);
+    if (existingTab) {
+      setActiveTab(existingTab.id);
+      return;
     }
-    isRemoteChange.current = false;
-  };
 
+    const ext = fileName.split('.').pop().toLowerCase();
+    const langMap = {
+      js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
+      json: 'json', md: 'markdown', css: 'css', html: 'html',
+      py: 'python', java: 'java', cpp: 'cpp', go: 'go', rs: 'rust',
+    };
+
+    const newTab = {
+      id: createTabId(),
+      name: fileName,
+      type: 'editor',
+      language: langMap[ext] || 'plaintext',
+    };
+
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTab(newTab.id);
+    setLanguage(newTab.language);
+  }, [tabs]);
+
+  const handleNewFile = useCallback(() => {
+    const newTab = {
+      id: createTabId(),
+      name: 'Untitled-1',
+      type: 'editor',
+      language: 'plaintext',
+    };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTab(newTab.id);
+    setLanguage('plaintext');
+  }, []);
+
+  const closeTab = useCallback((tabId) => {
+    setTabs((prev) => {
+      const newTabs = prev.filter((t) => t.id !== tabId);
+      if (activeTab === tabId && newTabs.length > 0) {
+        setActiveTab(newTabs[newTabs.length - 1].id);
+      } else if (newTabs.length === 0) {
+        const welcomeTab = { id: 'welcome', name: 'Welcome', type: 'welcome' };
+        setActiveTab('welcome');
+        return [welcomeTab];
+      }
+      return newTabs;
+    });
+  }, [activeTab]);
+
+  const switchTab = useCallback((tabId) => {
+    setActiveTab(tabId);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab && tab.language) {
+      setLanguage(tab.language);
+    }
+  }, [tabs]);
+
+  // ---- Cursor Position Tracking (unchanged) ----
+  const handleEditorMount = useCallback((editor) => {
+    editor.onDidChangeCursorPosition((e) => {
+      setCursorPosition({
+        line: e.position.lineNumber,
+        column: e.position.column,
+      });
+    });
+  }, []);
+
+  const currentTab = tabs.find((t) => t.id === activeTab);
+
+  // ---- Render (unchanged except CodeEditor props) ----
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">CodeTogether</h1>
-        <div className="flex gap-3">
-          <div className={`px-3 py-1 rounded-full text-sm ${
-            backendStatus === 'connected'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            {backendStatus === 'connected' ? '● API' : '○ API'}
-          </div>
-          <div className={`px-3 py-1 rounded-full text-sm ${
-            socketStatus === 'connected'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-          }`}>
-            {socketStatus === 'connected' ? '● Live' : '○ Connecting...'}
-          </div>
-        </div>
-      </header>
+    <div className="vscode-app">
+      <TitleBar
+        socketStatus={socketStatus}
+        backendStatus={backendStatus}
+      />
 
-      <main className="flex-1 p-6 flex flex-col gap-4">
-        <div className="text-gray-400 text-sm">
-          Open this page in another browser tab and start typing — changes sync in real-time!
-        </div>
-
-        <textarea
-          value={text}
-          onChange={handleTextChange}
-          className="flex-1 bg-gray-800 text-gray-100 font-mono text-sm p-4 rounded-lg border border-gray-700 resize-none focus:outline-none focus:border-blue-500 transition-colors"
-          placeholder="Start typing here... It will sync to other tabs in real-time!"
-          spellCheck={false}
+      <div className="vscode-main">
+        <ActivityBar
+          activePanel={activePanel}
+          onPanelChange={setActivePanel}
         />
-      </main>
 
-      <footer className="bg-blue-600 px-4 py-1 flex items-center justify-between text-white text-xs">
-        <span>WebSocket: {socketStatus}</span>
-        <span>Phase 2: Real-time Sync Demo</span>
-      </footer>
+        <Sidebar
+          activePanel={activePanel}
+          onFileOpen={openFile}
+        />
+
+        <div className="vscode-editor-area">
+          <TabBar
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabClick={switchTab}
+            onTabClose={closeTab}
+          />
+
+          <div className="vscode-editor-content">
+            {currentTab?.type === 'welcome' ? (
+              <WelcomeTab onNewFile={handleNewFile} />
+            ) : (
+              // NOTICE: No value or onChange props!
+              // Yjs + MonacoBinding handles everything
+              <CodeEditor
+                language={language}
+                onMount={handleEditorMount}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <StatusBar
+        language={language}
+        socketStatus={socketStatus}
+        lineNumber={cursorPosition.line}
+        columnNumber={cursorPosition.column}
+      />
     </div>
   );
 }

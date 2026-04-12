@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "yjs-server": "node yjs-server.js",
+    "server": "concurrently \"npm run dev\" \"npm run yjs-server\""
   },
   "keywords": [],
   "author": "",
@@ -16,9 +18,13 @@
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "ws": "^8.20.0",
+    "y-websocket": "^1.3.18",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.14"
   }
 }
