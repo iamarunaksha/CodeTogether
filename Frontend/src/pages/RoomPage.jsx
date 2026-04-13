@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getRoom, leaveRoom } from '../lib/collaboration';
+import { generateUserIdentity } from '../lib/userIdentity';
 
 // VS Code Shell Components
 import TitleBar from '../Components/TitleBar';
@@ -32,6 +33,10 @@ function RoomPage() {
   }
   const { yText, provider } = roomRef.current;
 
+  // Generate a persistent identity for this tab
+  // useRef so it doesn't change on every re-render
+  const userRef = useRef(generateUserIdentity());
+
   // ---- Connection State ----
   const [backendStatus, setBackendStatus] = useState('checking');
   const [socketStatus, setSocketStatus] = useState(
@@ -48,6 +53,9 @@ function RoomPage() {
     { id: createTabId(), name: 'Untitled-1', type: 'editor', language: 'javascript' },
   ]);
   const [activeTab, setActiveTab] = useState(tabs[0].id);
+
+  // ---- Presence State ----
+  const [connectedUsers, setConnectedUsers] = useState([]);
 
   // ---- Connection + Cleanup ----
   useEffect(() => {
@@ -74,6 +82,74 @@ function RoomPage() {
       leaveRoom(roomId);
     };
   }, [roomId, provider]);
+
+  // ---- Phase 6: Awareness (Live Cursors) ----
+  useEffect(() => {
+    const awareness = provider.awareness;
+
+    // 1. BROADCAST: Tell everyone who we are
+    awareness.setLocalStateField('user', {
+      name: userRef.current.name,
+      color: userRef.current.color,
+    });
+
+    // 2. LISTEN: When anyone's awareness state changes, update our user list
+    const handleAwarenessChange = () => {
+      const states = Array.from(awareness.getStates().entries());
+
+      const users = states
+        .filter(([, state]) => state.user)   // Only users who have set their identity
+        .map(([clientId, state]) => ({
+          clientId,
+          name: state.user.name,
+          color: state.user.color,
+        }));
+
+      setConnectedUsers(users);
+
+      // 3. INJECT CSS: Create dynamic per-user color styles
+      //    y-monaco uses classes like .yRemoteSelection-12345
+      //    We need to set --remote-user-color for each client ID
+      let styleContent = '';
+      users.forEach((user) => {
+        if (user.clientId !== awareness.doc.clientID) {
+          styleContent += `
+            .yRemoteSelection-${user.clientId} {
+              background-color: ${user.color}33;
+            }
+            .yRemoteSelectionHead-${user.clientId} {
+              border-color: ${user.color};
+            }
+            .yRemoteSelectionHead-${user.clientId}::after {
+              background-color: ${user.color};
+              content: '${user.name}';
+            }
+          `;
+        }
+      });
+
+      // Find or create the dynamic style tag
+      let styleEl = document.getElementById('yjs-cursor-styles');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'yjs-cursor-styles';
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = styleContent;
+    };
+
+    // Run immediately to catch users already in the room
+    handleAwarenessChange();
+
+    awareness.on('change', handleAwarenessChange);
+
+    return () => {
+      awareness.off('change', handleAwarenessChange);
+      // Clean up the injected style tag
+      const styleEl = document.getElementById('yjs-cursor-styles');
+      if (styleEl) styleEl.remove();
+    };
+  }, [provider]);
 
   // ---- Tab Management ----
   const openFile = useCallback((fileName) => {
@@ -180,6 +256,7 @@ function RoomPage() {
         socketStatus={socketStatus}
         lineNumber={cursorPosition.line}
         columnNumber={cursorPosition.column}
+        connectedUsers={connectedUsers}
       />
     </div>
   );

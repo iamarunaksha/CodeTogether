@@ -10,7 +10,7 @@ import {
   VscBroadcast,
 } from 'react-icons/vsc';
 
-function StatusBar({ language, socketStatus, lineNumber, columnNumber }) {
+function StatusBar({ language, socketStatus, lineNumber, columnNumber, connectedUsers = [] }) {
   return (
     <div className="vscode-statusbar">
       {/* Left side */}
@@ -32,6 +32,29 @@ function StatusBar({ language, socketStatus, lineNumber, columnNumber }) {
 
       {/* Right side */}
       <div className="vscode-statusbar-right">
+        {/* Connected users (Phase 6) */}
+        {connectedUsers.length > 0 && (
+          <div className="vscode-statusbar-item" style={{ gap: 4 }}>
+            {connectedUsers.slice(0, 5).map((user) => (
+              <span
+                key={user.clientId}
+                title={user.name}
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: user.color,
+                  display: 'inline-block',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              />
+            ))}
+            <span style={{ marginLeft: 2 }}>
+              {connectedUsers.length} {connectedUsers.length === 1 ? 'user' : 'users'}
+            </span>
+          </div>
+        )}
+
         {/* Live sync status */}
         <div className="vscode-statusbar-item">
           <VscBroadcast style={{ fontSize: 14 }} />
