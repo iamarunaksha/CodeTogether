@@ -1,6 +1,6 @@
 // ================================================
 // WelcomeTab.jsx — VS Code Welcome Screen
-// Matches the screenshot exactly — adapted for CodeTogether
+// Now with working Create Room and Join Room buttons
 // ================================================
 import {
   VscNewFile,
@@ -9,10 +9,9 @@ import {
   VscLiveShare,
   VscCodeOss,
   VscLightbulb,
-  VscChecklist,
 } from 'react-icons/vsc';
 
-function WelcomeTab({ onNewFile, recentItems = [] }) {
+function WelcomeTab({ onNewFile, onCreateRoom, onJoinRoom, recentItems = [] }) {
   return (
     <div className="vscode-welcome">
       {/* Header — "CodeTogether" with subtitle */}
@@ -33,10 +32,10 @@ function WelcomeTab({ onNewFile, recentItems = [] }) {
           <button className="vscode-welcome-link">
             <VscFolderOpened /> Open...
           </button>
-          <button className="vscode-welcome-link">
+          <button className="vscode-welcome-link" onClick={onCreateRoom}>
             <VscLiveShare /> Create Room...
           </button>
-          <button className="vscode-welcome-link">
+          <button className="vscode-welcome-link" onClick={onJoinRoom}>
             <VscRemote /> Join Room...
           </button>
 

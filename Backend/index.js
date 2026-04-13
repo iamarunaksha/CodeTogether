@@ -56,6 +56,58 @@ app.get('/api/health', (req, res) => {
 });
 
 // ================================================
+// ROOM ROUTES (Phase 5)
+// ================================================
+
+/**
+ * @openapi
+ * /api/rooms:
+ *   post:
+ *     summary: Create a new room
+ *     description: Creates a new room and returns its ID
+ *     tags:
+ *       - Rooms
+ *     responses:
+ *       201:
+ *         description: Room created successfully
+ */
+app.post('/api/rooms', (req, res) => {
+  // In Phase 5, rooms are created client-side with UUID.
+  // This endpoint exists for future use (Phase 7: database-backed rooms).
+  // For now, we just acknowledge the creation.
+  const { roomId } = req.body;
+  console.log(`🏠 Room created: ${roomId}`);
+  res.status(201).json({ roomId, created: new Date().toISOString() });
+});
+
+/**
+ * @openapi
+ * /api/rooms/{roomId}:
+ *   get:
+ *     summary: Get room info
+ *     description: Returns information about a specific room
+ *     tags:
+ *       - Rooms
+ *     parameters:
+ *       - in: path
+ *         name: roomId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Room information
+ */
+app.get('/api/rooms/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  res.json({
+    roomId,
+    status: 'active',
+    message: 'Room is available for collaboration',
+  });
+});
+
+// ================================================
 // WEBSOCKET EVENTS
 // ================================================
 

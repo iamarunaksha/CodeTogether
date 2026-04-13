@@ -2,11 +2,11 @@
 // Frontend/src/Components/CodeEditor.jsx
 // Monaco Editor — The VS Code Heart
 // ================================================
+import { useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { MonacoBinding } from 'y-monaco';
-import { yText, provider } from '../lib/collaboration';
 
-function CodeEditor({ language = 'javascript', onMount }) {
+function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
 
   // const handleEditorChange = (newValue) => {
   //   if (onChange) {
@@ -14,20 +14,39 @@ function CodeEditor({ language = 'javascript', onMount }) {
   //   }
   // };
 
+  // Store the binding so we can clean it up when the component unmounts
+  const bindingRef = useRef(null);
+
+  // Clean up the binding when the component unmounts or when yText/provider changes
+  useEffect(() => {
+    return () => {
+      if(bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
+      }
+    };
+  }, [yText, provider]);
+
   const handleEditorMount = (editor, monaco) => {
 
-    const binding = new MonacoBinding(
+    //Destroy any existing binding first (in case of hot reload)
+    if(bindingRef.current) {
+      bindingRef.current.destroy();
+    }
+
+    // Create the MonacoBinding — same as Phase 4, but now using
+    // the room-specific yText and provider passed as props
+    bindingRef.current = new MonacoBinding(
       yText,
       editor.getModel(),
       new Set([editor]),
       provider.awareness
     );
 
-    // Pass the editor instance up to App.jsx for cursor tracking
-    if (onMount) {
+    // Pass editor instance to parent for cursor tracking
+    if(onMount) {
       onMount(editor, monaco);
     }
-    // Focus the editor immediately
     editor.focus();
   };
 
