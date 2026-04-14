@@ -17,3 +17,12 @@ dist/
 Documentation/
 Walkthroughs.md
 *.docx
+
+# Environment variables
+.env
+
+# LevelDB data
+yjs-data/
+
+# Room metadata store (auto-generated)
+rooms.json

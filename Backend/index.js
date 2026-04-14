@@ -3,11 +3,14 @@
 // ================================================
 
 // 1. IMPORTS
+require('dotenv').config();
+
 const express = require('express');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
+const roomStore = require('./roomStore');
 
 // 2. CREATE EXPRESS APP
 const app = express();
@@ -25,7 +28,7 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // 5. MIDDLEWARE
 app.use(express.json());
@@ -72,12 +75,10 @@ app.get('/api/health', (req, res) => {
  *         description: Room created successfully
  */
 app.post('/api/rooms', (req, res) => {
-  // In Phase 5, rooms are created client-side with UUID.
-  // This endpoint exists for future use (Phase 7: database-backed rooms).
-  // For now, we just acknowledge the creation.
   const { roomId } = req.body;
-  console.log(`🏠 Room created: ${roomId}`);
-  res.status(201).json({ roomId, created: new Date().toISOString() });
+  const room = roomStore.createRoom(roomId);
+  console.log(`🏠 Room created and saved: ${roomId}`);
+  res.status(201).json({ roomId, ...room });
 });
 
 /**
@@ -100,12 +101,37 @@ app.post('/api/rooms', (req, res) => {
  */
 app.get('/api/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
-  res.json({
-    roomId,
-    status: 'active',
-    message: 'Room is available for collaboration',
-  });
+  const room = roomStore.getRoom(roomId);
+  
+  // Touch the room to update lastActive
+  roomStore.touchRoom(roomId);
+  
+  if (room) {
+    res.json({ roomId, ...room, status: 'active' });
+  } else {
+    // Room may exist in Yjs (via LevelDB) but not in our metadata store
+    // This is fine — it just means it was created before Phase 7
+    res.json({ roomId, status: 'active', message: 'Room exists in Yjs' });
+  }
 });
+
+/**
+ * @openapi
+ * /api/rooms:
+ *   get:
+ *     summary: List all rooms
+ *     description: Returns all known rooms with metadata
+ *     tags:
+ *       - Rooms
+ *     responses:
+ *       200:
+ *         description: List of rooms
+ */
+app.get('/api/rooms', (req, res) => {
+  const rooms = roomStore.getAllRooms();
+  res.json(rooms);
+});
+
 
 // ================================================
 // WEBSOCKET EVENTS
