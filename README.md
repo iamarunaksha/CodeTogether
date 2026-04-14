@@ -1,14 +1,83 @@
-# CodeTogether
+<!-- Replace the URL below with your actual Vercel link once finalized -->
+# ⚡ CodeTogether
 
-A real-time collaborative code editor with VS Code-style UI. Multiple users can code together in shared rooms with live cursors and version history.
+> A real-time, collaborative, sandboxed code editor built with the VS Code aesthetic. 
 
-## Tech Stack
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](#)
+[![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](#)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](#)
+[![Yjs](https://img.shields.io/badge/Yjs-CRDT-FF8C00)](#)
+[![Monaco Editor](https://img.shields.io/badge/Monaco_Editor-007ACC?logo=visualstudiocode&logoColor=white)](#)
 
-- **Frontend**: React, Tailwind CSS v4, Monaco Editor
-- **Backend**: Node.js, Express, Socket.IO
-- **Real-time Sync**: Yjs (CRDT)
-- **Database**: MongoDB Atlas
+CodeTogether is a powerful, web-based collaborative IDE that allows multiple users to type, edit, and execute code simultaneously in real-time. Modeled deeply after the VS Code desktop experience, it brings professional-grade editing paradigms directly to your browser without the need for logins or complex setups.
 
-## Status
+---
 
-🚧 Under construction — Phase 1
+## 🌟 Key Features
+
+* **Real-time Collaboration:** Powered by Yjs (CRDTs), allowing multiple users to edit the same file without conflicting lockouts.
+* **Live Cursors & Presence:** Seamlessly see exactly what your peers are doing with uniquely colored name-badged remote cursors.
+* **VS Code Aesthetic & Engine:** Built heavily on top of Microsoft's `Monaco Editor`, inheriting native syntax highlighting, minimaps, multi-cursor, and command palette functionalities.
+* **Sandboxed Code Execution:** Securely execute Javascript directly in the browser via an isolated, Blob URL-driven `<iframe>` engine. 
+* **Integrated Terminal:** A draggable, resizable mock terminal that intercepts and displays all `console.log` and unhandled exceptions outputted by user code.
+* **Persistent Rooms:** Backend persistence via LevelDB ensures your code fragments never get lost even if the entire room disconnects.
+
+## 📸 Screenshots
+
+*(Hey! I left these placeholders for you. Drop your screenshots into a `docs/` folder or paste them directly onto GitHub to replace these!)*
+
+| The Welcome Dash | The Collaborative Editor |
+|---|---|
+| <img width="1710" height="987" alt="Screenshot 2026-04-15 at 12 37 05 AM" src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" /> |
+
+<br>
+
+<div align="center">
+  <img width="1710" height="988" alt="Screenshot 2026-04-15 at 12 41 04 AM" src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" />
+</div>
+
+<br>
+
+---
+
+## 💻 Tech Stack
+
+### Frontend
+- **React.js (Vite)**
+- **Monaco Editor** (`@monaco-editor/react`)
+- **Yjs & y-websocket** (CRDT protocol state management)
+- **Vanilla CSS** (Carefully crafted VS Code theme tokens and flexbox-driven architecture)
+
+### Backend
+- **Node.js & Express**
+- **Yjs (y-websocket)** (Intercepted via proxy upgrade on Express HTTP Server)
+- **LevelDB** (`y-leveldb` for persistent storage of Yjs binaries on disk)
+- **Socket.io** (For fallback signaling and room management health-checks)
+
+---
+
+## 🚀 Quick Start (Local Setup)
+
+Want to run this locally? You'll need two separate terminal windows for the frontend and backend.
+
+**1. Start the API/WebSocket Server:**
+```bash
+cd CodeTogetherAPI
+npm install
+npm run dev
+```
+*(The backend will start on port 3001 and create a local ./yjs-data folder for persistence)*
+
+**2. Start the Frontend Application:**
+```bash
+cd Frontend
+npm install
+npm run dev
+```
+
+The frontend will open on `http://localhost:5173`. Create a room, open a new Incognito window, paste the room URL, and watch the collaborative magic happen!
+
+---
+
+## 🏛️ Architecture & Sandox
+The integrated code execution feature is built securely. Code is never evaluated (`eval()`) in the parent DOM. Instead, the runner converts the user's string data into a `Blob`, creates a pseudo-URL via `URL.createObjectURL()`, and attaches it to an invisible `<iframe>` locked down by the standard HTML5 `sandbox="allow-scripts"` attributes, completely severing parent-cookie and storage access. 
