@@ -14,8 +14,13 @@ const roomStore = require('./roomStore');
 const WebSocket = require('ws');
 const { setupWSConnection } = require('y-websocket/bin/utils');
 
+const cors = require('cors');
+
 // 2. CREATE EXPRESS APP
 const app = express();
+
+// Enable CORS for all origins so our Vercel frontend can call this Render API
+app.use(cors({ origin: '*' }));
 
 // 3. CREATE HTTP SERVER
 // Express alone only handles HTTP. To add WebSockets, we need the raw
@@ -25,7 +30,7 @@ const httpServer = createServer(app);
 // 4. CREATE SOCKET.IO SERVER
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:5173', // Allow connections from React
+    origin: '*', // Allow connections from anywhere (Vercel, localhost)
     methods: ['GET', 'POST'],
   },
 });
