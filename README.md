@@ -3,7 +3,7 @@
 
 > A real-time, collaborative, sandboxed code editor built with the VS Code aesthetic. 
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](#) https://code-together-arunaksha.vercel.app/
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](#) (https://code-together-arunaksha.vercel.app)
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](#)
 [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](#)
 [![Yjs](https://img.shields.io/badge/Yjs-CRDT-FF8C00)](#)
