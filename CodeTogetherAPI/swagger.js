@@ -15,7 +15,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3001',         // Where API runs
+        url: 'https://codetogether-kvta.onrender.com',         // Where API runs, for local : http://localhost:3001
         description: 'Development Server',
       },
     ],
