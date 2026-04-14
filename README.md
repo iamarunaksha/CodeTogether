@@ -27,8 +27,6 @@ CodeTogether is a powerful, web-based collaborative VS Code like IDE that allows
 | :---: | :---: |
 | <img src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" width="480" /> | <img src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" width="480" /> |
 
-<br>
-
 ---
 
 ## 💻 Tech Stack
