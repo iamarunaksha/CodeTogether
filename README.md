@@ -1,9 +1,8 @@
-<!-- Replace the URL below with your actual Vercel link once finalized -->
 # ⚡ CodeTogether
 
 > A real-time, collaborative, sandboxed code editor built with the VS Code aesthetic. 
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](#) (https://code-together-arunaksha.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](https://code-together-arunaksha.vercel.app)
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](#)
 [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](#)
 [![Yjs](https://img.shields.io/badge/Yjs-CRDT-FF8C00)](#)
@@ -25,11 +24,8 @@ CodeTogether is a powerful, web-based collaborative IDE that allows multiple use
 ## 📸 Screenshots
 
 | The Welcome Dash | The Collaborative Editor |
-|---|---|
-| <img width="1710" height="987" alt="Screenshot 2026-04-15 at 12 37 05 AM" src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" /> |
-| <img width="1710" height="988" alt="Screenshot 2026-04-15 at 12 41 04 AM" src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" /> |
-
-<br>
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" width="450" /> | <img src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" width="450" /> |
 
 <br>
 
