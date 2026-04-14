@@ -2,6 +2,9 @@
 // Frontend/src/pages/RoomPage.jsx
 // The page component for /room/:roomId
 // ================================================
+import TerminalPanel from '../Components/TerminalPanel';
+import { executeCode } from '../lib/codeRunner';
+import { VscPlay } from 'react-icons/vsc';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getRoom, leaveRoom } from '../lib/collaboration';
@@ -56,6 +59,14 @@ function RoomPage() {
 
   // ---- Presence State ----
   const [connectedUsers, setConnectedUsers] = useState([]);
+
+  // ---- Terminal State ----
+  const [terminalOutput, setTerminalOutput] = useState([]);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Store the Monaco editor instance so we can read its value
+  const editorRef = useRef(null);
 
   // ---- Connection + Cleanup ----
   useEffect(() => {
@@ -201,13 +212,64 @@ function RoomPage() {
   }, [tabs]);
 
   // ---- Cursor Position Tracking ----
-  const handleEditorMount = useCallback((editor) => {
+  const handleEditorMount = useCallback((editor, monaco) => {
+    
+    editorRef.current = editor;  // Store editor for code reading
+
     editor.onDidChangeCursorPosition((e) => {
       setCursorPosition({
         line: e.position.lineNumber,
         column: e.position.column,
       });
     });
+
+    // Ctrl+Enter / Cmd+Enter keyboard shortcut to run code
+    editor.addAction({
+      id: 'run-code',
+      label: 'Run Code',
+      keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      ],
+      run: () => handleRun(),
+    });
+  }, []);
+
+  // ---- Code Execution (Phase 8) ----
+  const handleRun = useCallback(() => {
+    if (isRunning) return;
+
+    const code = editorRef.current?.getValue() || '';
+    if (!code.trim()) {
+      setTerminalOutput(prev => [...prev, {
+        type: 'system', args: ['No code to execute.'],
+      }]);
+      setTerminalOpen(true);
+      return;
+    }
+
+    setIsRunning(true);
+    setTerminalOpen(true);
+
+    setTerminalOutput(prev => [...prev, {
+      type: 'system',
+      args: ['▶ Running JavaScript... (' + new Date().toLocaleTimeString() + ')'],
+    }]);
+
+    executeCode(
+      code,
+      (output) => setTerminalOutput(prev => [...prev, output]),
+      () => {
+        setTerminalOutput(prev => [...prev, {
+          type: 'system', args: ['✓ Program exited.'],
+        }]);
+        setIsRunning(false);
+      },
+      5000
+    );
+  }, [isRunning]);
+
+  const handleClear = useCallback(() => {
+    setTerminalOutput([]);
   }, []);
 
   const currentTab = tabs.find((t) => t.id === activeTab);
@@ -231,12 +293,28 @@ function RoomPage() {
         />
 
         <div className="vscode-editor-area">
-          <TabBar
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabClick={switchTab}
-            onTabClose={closeTab}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--vscode-tab-bar-bg)' }}>
+            <div>
+              <TabBar
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabClick={switchTab}
+                onTabClose={closeTab}
+              />
+            </div>
+
+            <div style={{ marginLeft: '92.5rem' }}>
+              <button
+                className="vscode-run-button"
+                onClick={handleRun}
+                disabled={isRunning}
+                title="Run Code (Ctrl+Enter)"
+              >
+                <VscPlay style={{ fontSize: 14 }} />
+                {isRunning ? 'Running...' : 'Run'}
+              </button>
+            </div>
+          </div>
 
           <div className="vscode-editor-content">
             {currentTab?.type === 'editor' ? (
@@ -248,6 +326,15 @@ function RoomPage() {
               />
             ) : null}
           </div>
+
+          {terminalOpen && (
+            <TerminalPanel
+              output={terminalOutput}
+              onRun={handleRun}
+              onClear={handleClear}
+              onClose={() => setTerminalOpen(false)}
+            />
+          )}
         </div>
       </div>
 

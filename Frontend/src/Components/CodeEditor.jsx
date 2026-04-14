@@ -43,6 +43,19 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
       provider.awareness
     );
 
+    // FIX: When a user first joins, their cursor doesn't appear for others
+    // because no selection event has fired yet. We simulate a selection change
+    // after a short delay so our initial cursor position is broadcasted.
+    setTimeout(() => {
+      const position = editor.getPosition();
+      if (position && monaco) {
+        editor.setSelection(new monaco.Selection(
+          position.lineNumber, position.column,
+          position.lineNumber, position.column
+        ));
+      }
+    }, 50);
+
     // Pass editor instance to parent for cursor tracking
     if(onMount) {
       onMount(editor, monaco);

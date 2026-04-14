@@ -20,5 +20,6 @@ export default defineConfig({
         ws: true,  // <-- This enables WebSocket proxying!
       }
     },
+    host: true
   },
 })

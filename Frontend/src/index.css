@@ -732,3 +732,141 @@ html, body, #root {
   pointer-events: none;
   z-index: 100;
 }
+
+/* ================================================
+   Phase 8: Terminal Panel Styles
+   VS Code-style integrated terminal
+   ================================================ */
+
+.vscode-terminal-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--vscode-panel-bg);
+  border-top: 1px solid var(--vscode-border);
+  min-height: 100px;
+  position: relative;
+  /* height is now controlled dynamically by inline styles in React */
+}
+
+.vscode-terminal-resize-handle {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  z-index: 10;
+}
+
+.vscode-terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 35px;
+  min-height: 35px;
+  background: var(--vscode-tab-bar-bg);
+  border-bottom: 1px solid var(--vscode-border-light);
+  padding: 0 8px;
+  user-select: none;
+}
+
+.vscode-terminal-tabs {
+  display: flex;
+  gap: 0;
+  align-items: center;
+}
+
+.vscode-terminal-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s;
+}
+
+.vscode-terminal-tab:hover {
+  color: var(--vscode-text-primary);
+}
+
+.vscode-terminal-tab.active {
+  color: var(--vscode-text-primary);
+  border-bottom-color: var(--vscode-accent);
+}
+
+.vscode-terminal-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.vscode-terminal-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--vscode-text-secondary);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.vscode-terminal-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--vscode-text-primary);
+}
+
+.vscode-terminal-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  font-family: var(--vscode-editor-font);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vscode-terminal-line {
+  padding: 1px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.vscode-terminal-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Run button in the TabBar area */
+.vscode-run-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  margin-right: 8px;
+  border: none;
+  background: #388a34;
+  color: #fff;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  cursor: pointer;
+  border-radius: 3px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.vscode-run-button:hover {
+  background: #46a340;
+}
+
+.vscode-run-button:active {
+  background: #2d7129;
+}
+
+.vscode-run-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

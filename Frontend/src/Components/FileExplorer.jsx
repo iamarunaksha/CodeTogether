@@ -52,8 +52,8 @@ const demoFiles = [
       { name: 'index.css', type: 'file' },
     ],
   },
-  { name: 'package.json', type: 'file' },
-  { name: 'vite.config.js', type: 'file' },
+  // { name: 'package.json', type: 'file' },
+  // { name: 'vite.config.js', type: 'file' },
   { name: 'index.html', type: 'file' },
 ];
 
