@@ -70,8 +70,11 @@ function RoomPage() {
 
   // ---- Connection + Cleanup ----
   useEffect(() => {
-    // Check HTTP backend health
-    fetch('/api/health')
+    // Check HTTP backend health using the env variable
+    // If VITE_BACKEND_URL is set (e.g. Render URL), use it. Otherwise, default to relative '/api/health' which Vite proxies locally.
+    const apiUrl = import.meta.env.VITE_BACKEND_URL ? `${import.meta.env.VITE_BACKEND_URL}/api/health` : '/api/health';
+    
+    fetch(apiUrl)
       .then((res) => res.json())
       .then(() => setBackendStatus('connected'))
       .catch(() => setBackendStatus('disconnected'));

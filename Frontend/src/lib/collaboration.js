@@ -30,10 +30,14 @@ export function getRoom(roomId) {
   
   /* Connect to the Yjs WebSocket server with this specific room ID.
    The server automatically creates a separate "room" for each unique roomId.
-   Two users connecting with roomId "abc-123" share data.
-   A user connecting with roomId "xyz-789" gets completely separate data. */
+   If VITE_BACKEND_URL is set (in production), we proxy it to the /yjs endpoint.
+   Otherwise we fall back to localhost:1234 for your local development workflow. */
+  const wsUrl = import.meta.env.VITE_BACKEND_URL 
+    ? import.meta.env.VITE_BACKEND_URL.replace('http', 'ws') + '/yjs' 
+    : 'ws://localhost:1234';
+
   const provider = new WebsocketProvider(
-    'ws://localhost:1234',
+    wsUrl,
     roomId,
     ydoc
   );
