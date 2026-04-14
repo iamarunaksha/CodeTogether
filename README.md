@@ -8,7 +8,7 @@
 [![Yjs](https://img.shields.io/badge/Yjs-CRDT-FF8C00)](#)
 [![Monaco Editor](https://img.shields.io/badge/Monaco_Editor-007ACC?logo=visualstudiocode&logoColor=white)](#)
 
-CodeTogether is a powerful, web-based collaborative IDE that allows multiple users to type, edit, and execute code simultaneously in real-time. Modeled deeply after the VS Code desktop experience, it brings professional-grade editing paradigms directly to your browser without the need for logins or complex setups.
+CodeTogether is a powerful, web-based collaborative VS Code like IDE that allows multiple users to type, edit, and execute code simultaneously in real-time. Modeled deeply after the VS Code desktop experience, it brings professional-grade editing paradigms directly to your browser without the need for logins or complex setups. Currently, it only runs JS code.
 
 ---
 
