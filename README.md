@@ -26,12 +26,13 @@ CodeTogether is a powerful, web-based collaborative IDE that allows multiple use
 
 *(Hey! I left these placeholders for you. Drop your screenshots into a `docs/` folder or paste them directly onto GitHub to replace these!)*
 
-| The Welcome Dash | The Collaborative Editor |
+| The Welcome Dash | 
 |---|---|
 | <img width="1710" height="987" alt="Screenshot 2026-04-15 at 12 37 05 AM" src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" /> |
 
 <br>
 
+| The Collaborative Editor |
 <div align="center">
   <img width="1710" height="988" alt="Screenshot 2026-04-15 at 12 41 04 AM" src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" />
 </div>
