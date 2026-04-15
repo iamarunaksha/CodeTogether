@@ -9,8 +9,8 @@ const options = {
   definition: {
     openapi: '3.0.0',  // The OpenAPI version
     info: {
-      title: 'CodeTogether API',             // Name shown at the top of the Swagger page
-      version: '1.0.0',                      // API version
+      title: 'CodeTogether API',             
+      version: '1.0.0',                      
       description: 'API for the CodeTogether real-time collaborative code editor',
     },
     servers: [
@@ -22,12 +22,10 @@ const options = {
       },
     ],
   },
-  // This tells swagger-jsdoc WHERE to look for route documentation
-  // It scans all .js files in the current directory for special /** comments */
+
   apis: ['./*.js'],
 };
 
-// Generate the specification object from our options
 const swaggerSpec = swaggerJsdoc(options);
 
 module.exports = swaggerSpec;
