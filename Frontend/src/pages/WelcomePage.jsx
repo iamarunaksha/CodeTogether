@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
-// Reuse our existing VS Code shell components
+// Reuse existing VS Code shell components
 import TitleBar from '../Components/TitleBar';
 import ActivityBar from '../Components/ActivityBar';
 import Sidebar from '../Components/Sidebar';
@@ -15,8 +15,7 @@ import WelcomeTab from '../Components/WelcomeTab';
 import StatusBar from '../Components/StatusBar';
 
 function WelcomePage() {
-  // useNavigate is a React Router hook that lets us redirect the user
-  // programmatically (without them clicking a <Link>)
+  
   const navigate = useNavigate();
 
   // UI state for the sidebar
@@ -25,8 +24,8 @@ function WelcomePage() {
   // ---- Create a new room ----
   // Generates a UUID and navigates to /room/<uuid>
   const handleCreateRoom = () => {
-    const roomId = uuidv4();  // e.g., "550e8400-e29b-41d4-a716-446655440000"
-    console.log(`🏠 Created room: ${roomId}`);
+    const roomId = uuidv4();  // "550e8400-e29b-41d4-a716-446655440000"
+    console.log(`Created room: ${roomId}`);
     navigate(`/room/${roomId}`);
   };
 
@@ -37,7 +36,7 @@ function WelcomePage() {
     const roomId = prompt('Enter the Room ID or paste the share link:');
     
     if(roomId) {
-      // Handle if user pastes a full URL like "http://localhost:5173/room/abc-123"
+      // Handles the case if user pastes a full URL like "http://localhost:5173/room/abc-123"
       const id = roomId.includes('/room/') 
         ? roomId.split('/room/')[1]   // Extract just the ID part
         : roomId.trim();              // Use as-is if it's just the ID
