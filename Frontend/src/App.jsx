@@ -1,7 +1,5 @@
 // ================================================
-// App.jsx — Now a Router that directs traffic
-// / → Welcome page (create/join rooms)
-// /room/:roomId → Collaborative editor room
+// Welcome page (create/join rooms)
 // ================================================
 import { Routes, Route } from 'react-router-dom';
 import WelcomePage from './pages/WelcomePage';
@@ -10,10 +8,10 @@ import RoomPage from './pages/RoomPage';
 function App() {
   return (
     <Routes>
-      {/* The Welcome page — shown at the root URL */}
+      {/* Welcome Page Router */}
       <Route path="/" element={<WelcomePage />} />
-      
-      {/* A room — the :roomId part is a URL parameter */}
+
+      {/* Create Room/Join Room Router */}
       <Route path="/room/:roomId" element={<RoomPage />} />
     </Routes>
   );
