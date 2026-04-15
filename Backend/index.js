@@ -109,8 +109,7 @@ app.get('/api/rooms/:roomId', (req, res) => {
   if (room) {
     res.json({ roomId, ...room, status: 'active' });
   } else {
-    // Room may exist in Yjs (via LevelDB) but not in our metadata store
-    // This is fine — it just means it was created before Phase 7
+    // Room may exist in Yjs (via LevelDB) but not in metadata store
     res.json({ roomId, status: 'active', message: 'Room exists in Yjs' });
   }
 });
@@ -155,7 +154,7 @@ io.on('connection', (socket) => {
 // ================================================
 // START THE SERVER
 // ================================================
-// We must use httpServer.listen() instead of app.listen()
+// Use httpServer.listen() instead of app.listen()
 httpServer.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Swagger docs: http://localhost:${PORT}/api-docs`);
