@@ -306,7 +306,7 @@ function RoomPage() {
               />
             </div>
 
-            <div style={{ marginLeft: '92.5rem' }}>
+            <div style={{ marginLeft: 'auto', marginRight: '15px' }}>
               <button
                 className="vscode-run-button"
                 onClick={handleRun}
