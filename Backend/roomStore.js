@@ -3,8 +3,6 @@
 // ================================================
 // This stores room metadata (creator, creation time, etc.)
 // separately from the Yjs document data.
-// Yjs handles the CODE persistence (via LevelDB).
-// This file handles the ROOM LISTING persistence.
 
 const fs = require('fs');
 const path = require('path');
