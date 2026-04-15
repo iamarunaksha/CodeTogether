@@ -23,8 +23,6 @@ const app = express();
 app.use(cors({ origin: '*' }));
 
 // 3. CREATE HTTP SERVER
-// Express alone only handles HTTP. To add WebSockets, we need the raw
-// HTTP server that Express sits on top of.
 const httpServer = createServer(app);
 
 // 4. CREATE SOCKET.IO SERVER
@@ -66,7 +64,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ================================================
-// ROOM ROUTES (Phase 5)
+// ROOM ROUTES
 // ================================================
 
 /**
@@ -116,8 +114,7 @@ app.get('/api/rooms/:roomId', (req, res) => {
   if (room) {
     res.json({ roomId, ...room, status: 'active' });
   } else {
-    // Room may exist in Yjs (via LevelDB) but not in our metadata store
-    // This is fine — it just means it was created before Phase 7
+    // Room may exist in Yjs (via LevelDB) but not in metadata store
     res.json({ roomId, status: 'active', message: 'Room exists in Yjs' });
   }
 });
@@ -143,7 +140,6 @@ app.get('/api/rooms', (req, res) => {
 // ================================================
 // WEBSOCKET EVENTS
 // ================================================
-
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
@@ -162,7 +158,6 @@ io.on('connection', (socket) => {
 // ================================================
 // YJS WEBSOCKET SERVER (Merged for Render)
 // ================================================
-// We create a headless WS server for Yjs
 const yjsWss = new WebSocket.Server({ noServer: true });
 
 yjsWss.on('connection', (ws, req) => {
@@ -178,14 +173,11 @@ httpServer.on('upgrade', (request, socket, head) => {
       yjsWss.emit('connection', ws, request);
     });
   }
-  // All other upgrades (like /socket.io/) are handled automatically 
-  // by the Socket.IO server we attached earlier!
 });
 
 // ================================================
 // START THE SERVER
 // ================================================
-// We must use httpServer.listen() instead of app.listen()
 httpServer.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Swagger docs: http://localhost:${PORT}/api-docs`);
