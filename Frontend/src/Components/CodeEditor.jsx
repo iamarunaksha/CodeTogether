@@ -191,7 +191,7 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
         cursorSmoothCaretAnimation: 'on',
         smoothScrolling: true,
         bracketPairColorization: { enabled: true },
-        padding: { top: 16 },
+        padding: { top: 28 },
       }}
     />
   );
