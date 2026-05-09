@@ -157,8 +157,16 @@ function RoomPage() {
 
     awareness.on('change', handleAwarenessChange);
 
+    provider.on('sync', () => {
+      handleAwarenessChange();
+    });
+
     return () => {
+      
       awareness.off('change', handleAwarenessChange);
+
+      provider.off('sync', handleAwarenessChange); // clean up sync listener
+
       // Clean up the injected style tag
       const styleEl = document.getElementById('yjs-cursor-styles');
       if (styleEl) styleEl.remove();

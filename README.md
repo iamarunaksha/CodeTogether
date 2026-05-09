@@ -27,6 +27,7 @@ CodeTogether is a powerful, web-based collaborative VS Code like IDE that allows
 | :---: | :---: |
 | <img src="https://github.com/user-attachments/assets/976354a6-0248-4f06-837f-a9121cc97c73" width="480" /> | <img src="https://github.com/user-attachments/assets/926a4d65-e8ee-4d32-9517-dbcdeec9db1a" width="480" /> |
 
+
 ---
 
 ## 💻 Tech Stack
@@ -70,3 +71,6 @@ The frontend will open on `http://localhost:5173`. Create a room, open a new Inc
 
 ## 🏛️ Architecture & Sandox
 The integrated code execution feature is built securely. Code is never evaluated (`eval()`) in the parent DOM. Instead, the runner converts the user's string data into a `Blob`, creates a pseudo-URL via `URL.createObjectURL()`, and attaches it to an invisible `<iframe>` locked down by the standard HTML5 `sandbox="allow-scripts"` attributes, completely severing parent-cookie and storage access. 
+
+## 📝 License
+MIT License

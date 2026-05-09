@@ -711,6 +711,8 @@ html, body, #root {
   position: relative;
   border-left: 2px solid var(--remote-user-color, #ffc800);
   border-top: 2px solid var(--remote-user-color, #ffc800);
+  pointer-events: none;
+  cursor: text;
 }
 
 /* The floating name label above the cursor */
