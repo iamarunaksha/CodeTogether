@@ -704,6 +704,7 @@ html, body, #root {
 /* The highlighted selection range (when a remote user selects text) */
 .yRemoteSelection {
   background-color: var(--remote-user-color, rgba(255, 200, 0, 0.3));
+  pointer-events: none;
 }
 
 /* The cursor "head" — the thin vertical line showing where they're typing */
@@ -711,6 +712,7 @@ html, body, #root {
   position: relative;
   border-left: 2px solid var(--remote-user-color, #ffc800);
   border-top: 2px solid var(--remote-user-color, #ffc800);
+  pointer-events: none;
 }
 
 /* The floating name label above the cursor */
