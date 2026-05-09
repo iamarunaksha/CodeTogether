@@ -4,7 +4,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Live-brightgreen.svg)](https://code-together-arunaksha.web.app)
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?logo=vite&logoColor=FFD62E)](https://code-together-arunaksha.netlify.app)
-[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)]()
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](#)
 [![Yjs](https://img.shields.io/badge/Yjs-CRDT-FF8C00)](#)
 [![Monaco Editor](https://img.shields.io/badge/Monaco_Editor-007ACC?logo=visualstudiocode&logoColor=white)](#)
 
@@ -71,6 +71,3 @@ The frontend will open on `http://localhost:5173`. Create a room, open a new Inc
 
 ## 🏛️ Architecture & Sandox
 The integrated code execution feature is built securely. Code is never evaluated (`eval()`) in the parent DOM. Instead, the runner converts the user's string data into a `Blob`, creates a pseudo-URL via `URL.createObjectURL()`, and attaches it to an invisible `<iframe>` locked down by the standard HTML5 `sandbox="allow-scripts"` attributes, completely severing parent-cookie and storage access. 
-
-## 📝 License
-MIT License
