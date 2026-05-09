@@ -1,0 +1,69 @@
+# FAANG Interview Prep: CodeTogether (Architect & Senior SDE Focus)
+
+This guide is tailored specifically for your profile: a BTech grad with 1 year of enterprise experience at TCS and PwC, interviewing for an SDE-1 position at a FAANG company. 
+
+When interviewing with Senior SDEs or Architects, they don't care much about basic React syntax. They want to see that you understand **trade-offs, security boundaries, system constraints, and distributed state**. 
+
+Here are the hard-hitting questions they will ask, with answers framed to sound natural, experienced, and self-aware.
+
+---
+
+## 1. Motivation & Trade-offs (The "Why" Questions)
+
+**Q: In your day job at TCS/PwC, you likely work with standard REST APIs and databases. Why build a real-time collaborative editor on the side?**
+**A:** "Exactly. At work, I deal with a lot of standard, stateless CRUD architectures and request-response cycles. I wanted to build this because real-time collaboration forces you to solve entirely different problems: maintaining stateful WebSocket connections, handling race conditions without blocking the UI, and merging distributed data without a central database lock. It was a completely different mental model from enterprise Java/Node backends, and I wanted to prove to myself that I could architect a system where state lives concurrently on multiple clients."
+
+**Q: You chose CRDTs (Conflict-free Replicated Data Types) over OT (Operational Transformation). Google Docs uses OT. Why do you think your choice was better for this project?**
+**A:** "I actually researched Google’s OT papers first. OT essentially requires a central 'truth' server to sequence and transform operations. If two people type at the same time, the server has to transform your operation against mine so the document doesn't break. The algorithm is notoriously difficult to implement without edge-case bugs.
+I chose Yjs (which uses a sequence CRDT) because it's peer-to-peer by design. The sequence is mathematically guaranteed to converge based on the logical clocks and client IDs of the operations themselves—no complex server transformation needed. For a solo project, it meant I could keep the backend incredibly dumb: it just broadcasts binary blobs. The trade-off is higher memory usage per character to store the CRDT metadata, but for source code files which are rarely larger than a few megabytes, it's a trade-off I was happy to make."
+
+## 2. Security & The Execution Sandbox
+
+**Q: If I'm a malicious user, what's stopping me from writing `document.cookie` or an infinite `while(true)` loop in your browser code runner?**
+**A:** "Security was my biggest concern with client-side execution. If I just used `eval()`, a user could scrape local storage or hijack the main React thread. 
+To isolate execution, I dynamically generate an HTML string containing the code and load it into a hidden `<iframe>` using a Blob URL. Crucially, I set the iframe attribute `sandbox="allow-scripts"`. Because I deliberately omit `allow-same-origin`, the browser treats that iframe as a unique, opaque origin. It has absolutely no access to the parent window's DOM, cookies, or network credentials.
+For the infinite loop problem: Web Workers are great for background tasks, but you can't cleanly intercept their console outputs or aggressively kill them without side effects sometimes. With the iframe, I wrap the execution in a 5-second `setTimeout` in the parent window. If the iframe doesn't post a 'complete' message via `postMessage` in 5 seconds, I literally delete the iframe node from the DOM and revoke the Blob URL, which instantly kills the rogue thread with zero impact on the main editor."
+
+## 3. Distributed Systems & Scalability Constraints
+
+**Q: Right now, this runs on a single Render instance. What happens when your post on HackerNews goes viral and you get 10,000 concurrent users? How does this break?**
+**A:** "It breaks almost immediately for two reasons. 
+First, Node.js is single-threaded, and maintaining 10,000 concurrent WebSockets will exhaust the server's memory or file descriptors. 
+Second, I'm using LevelDB for persistence. LevelDB gets an exclusive lock on the file system. If I try to spin up a second or third Node instance to handle the traffic, they'd crash trying to read the same database file. 
+
+To actually scale this, I'd need to shard the architecture:
+1. Put the Express server behind a load balancer to handle room creation.
+2. Put the WebSocket servers behind a load balancer with **sticky sessions** (based on room ID). This ensures all users in 'Room A' connect to the exact same physical server, avoiding the need for servers to constantly talk to each other.
+3. If users in the same room *must* be split across different servers, I'd introduce a Redis pub/sub layer using something like `y-redis`, so Server 1 can broadcast CRDT updates to Server 2.
+4. I'd replace LevelDB with Postgres or DynamoDB so any stateless server can read the initial document snapshot."
+
+## 4. Frontend Resilience
+
+**Q: WebSockets drop all the time—users go into tunnels on their phones, ISPs blip. What happens to a user's code if they type while disconnected?**
+**A:** "That's another reason I love the CRDT approach. If a user drops connection, the Yjs document and the Monaco editor keep working perfectly. The user can write 50 lines of code offline.
+Yjs natively queues these operations. When the WebSocket reconnects, the provider performs a sync step. Instead of sending the whole file, it exchanges State Vectors (essentially saying 'I have data up to clock 50, what do you have?'). The server responds with the missing updates, and the client flushes its offline queue. It merges seamlessly. I don't have to write any custom reconnection buffering logic; the data structure handles its own consistency."
+
+## 5. Deployment Quirks & DevOps
+
+**Q: Tell me about a time something worked perfectly on your local machine but broke in production.**
+**A:** "The frontend deployment to Firebase was a perfect example. Locally, Vite’s dev proxy sends `/api/health` perfectly to my backend. On Vercel, it built perfectly. But when I deployed the frontend to Firebase, the API and WebSocket connections failed on the first load of the room, but magically worked if you refreshed the page.
+
+It turned out to be an aggressive caching issue. Firebase Hosting defaults to caching `index.html` for 1 hour (`max-age=3600`). When I pushed my `VITE_BACKEND_URL` environment variables, my local browser was refusing to fetch the new HTML file, so it was running an old cached JavaScript bundle that lacked the production URL. I had to go into `firebase.json` and explicitly rewrite the Headers for `index.html` to be `Cache-Control: no-cache`. It taught me a hard lesson: your CI/CD pipeline is useless if your CDN refuses to serve the new files to the client."
+
+---
+
+## 6. Future Implementations (The Road Ahead)
+
+When an interviewer asks, "What would you add next if you had 3 more months?", this is your chance to show you think at an architect level.
+
+**1. Multi-Language Server-Side Execution (Docker/K8s)**
+"Right now, I only run JavaScript because I can sandbox it in the browser. To support Python, C++, or Go, I want to build a remote execution engine. My plan is to spin up an ephemeral Docker container for every execution request. I'd pass the code in, run it with strict `cgroups` limiting the CPU to 1 core, memory to 50MB, and disabling network access entirely so they can't run botnets or DDOS attacks. Then I'd capture `stdout` and tear the container down."
+
+**2. File System & Language Server Protocol (LSP)**
+"Currently, it's a single flat document. I'd love to upgrade it to a full workspace. This means changing the syncing mechanism from a single `Y.Text` to a `Y.Map` where keys are file paths. More importantly, to make it a *real* IDE, I'd want to run a Language Server on the backend. Monaco supports the Language Server Protocol (LSP), so I could stream deeper IntelliSense, hover definitions, and compiler warnings over a secondary WebSocket channel."
+
+**3. Voice/Video Collaboration**
+"When pair programming, you need to talk. I plan to integrate WebRTC. Since my backend already has Socket.IO running, I can use that entirely for WebRTC signaling (exchanging SDP offers and ICE candidates). Once the WebRTC peer-to-peer connection is established, the audio and video stream directly between the clients, resulting in zero bandwidth cost on my Node server."
+
+**4. JWT Authentication & Room RBAC**
+"Currently, rooms are open to anyone with the link, and you get assigned a random animal name. I'd implement Google OAuth. Once logged in, the backend would issue an HTTP-only JWT. We could then implement Role-Based Access Control (RBAC): the person who creates the room is the 'Owner', and they can set the room to 'Read-Only' for guests, or generate temporary invite tokens."

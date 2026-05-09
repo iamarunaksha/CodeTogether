@@ -1,0 +1,57 @@
+# CodeTogether Implementation Plan
+**Objective**: Build a real-time collaborative code editor with a pixel-perfect VS Code UI.
+
+---
+
+### Phase 1: Basic VS Code Layout ✅
+**Goal**: Create the structural shell of VS Code.
+- `App.jsx` orchestrating the layout components.
+- `TitleBar.jsx` (App menu, search bar, window controls).
+- `ActivityBar.jsx` (Leftmost thin sidebar with icons).
+- `Sidebar.jsx` (Collapsible panel, initially containing `FileExplorer.jsx`).
+- `StatusBar.jsx` (Bottom bar with stats and language).
+
+### Phase 2: Editor Area & Tabs ✅
+**Goal**: Integrate Monaco Editor and implement the tab system.
+- `TabBar.jsx` (Scrollable list of open files).
+- `CodeEditor.jsx` (Wrapper around `@monaco-editor/react`).
+- `WelcomeTab.jsx` (VS Code's iconic "Get Started" page).
+- State management for active tabs, open files, and editor content.
+
+### Phase 3: Backend & Socket.IO Foundation ✅
+**Goal**: Set up the Express/Socket.IO backend server.
+- `server.js` or `index.js` running Express + HTTP Server.
+- Basic Socket.IO connection handling.
+- Placeholder for collaborative text sync.
+
+### Phase 4: Yjs Integration (Real-Time Sync) ✅
+**Goal**: Replace manual Socket.IO events with Yjs for conflict-free editing.
+- Integrate `yjs` and `y-websocket`.
+- Bind the Monaco editor to a shared Yjs `Y.Text` type.
+- Verify real-time synchronization between two browser tabs.
+
+### Phase 5: Rooms + Shareable Links ✅
+**Goal**: Create isolated coding rooms that people can join via a link.
+- Implement React Router for `/room/:roomId` URLs.
+- Update Yjs connection logic to connect to unique room IDs.
+- Create UI for generating and sharing room links from the Welcome Tab.
+
+### Phase 6: Live Cursors + User Presence ✅
+**Goal**: See where other people are typing.
+- Track Monaco cursor positions and selections.
+- Use Yjs Awareness protocol to broadcast cursor state.
+- Render styled cursor flags (decorations) with user names in the editor.
+- Show connected user count + colored dots in StatusBar.
+
+### Phase 7: Database & Persistence ✅
+**Goal**: Save code so it doesn't disappear when the server restarts.
+- Connect the Node backend to MongoDB or LevelDB.
+- Intercept Yjs document updates on the server and save them.
+- Load historical data when a room is first spun up.
+
+### Phase 8: Code Execution ✅
+**Goal**: Run the code in the browser.
+- Implement sandboxed iframe execution with console interception.
+- Build a VS Code-style integrated Terminal panel.
+- Add Ctrl+Enter keyboard shortcut for running code.
+- Deployment to Production (Render + Vercel).

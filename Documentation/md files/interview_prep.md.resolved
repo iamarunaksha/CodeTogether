@@ -1,0 +1,364 @@
+# CodeTogether — Interview Preparation Guide
+
+A comprehensive Q&A bank for explaining this project confidently in FAANG SDE-1 interviews. Questions are grouped by topic and ordered from surface-level to deep-dive within each section.
+
+---
+
+## 1. Project Overview & Motivation
+
+### Q: Walk me through what CodeTogether is and why you built it.
+
+**A:** CodeTogether is a real-time collaborative code editor that runs in the browser. Think of it like Google Docs but specifically for code — multiple people can open the same room, type simultaneously, see each other's cursors, and run JavaScript right in the browser.
+
+I built it because I wanted to understand how real-time collaboration actually works under the hood. Tools like VS Code Live Share and Google Docs feel like magic, and I wanted to demystify that. The project forced me to deal with problems I'd never hit in a typical CRUD app — conflict resolution, WebSocket lifecycle management, sandboxed execution, and deploying a multi-service architecture.
+
+### Q: What tech stack did you use and why those specific choices?
+
+**A:** 
+- **Frontend:** React with Vite. I picked Vite over CRA because the dev server starts in under 300ms versus 8-10 seconds with CRA. For a project where I'm constantly reloading to test real-time sync, that adds up fast.
+- **Editor:** Monaco Editor — it's literally the same editor engine that powers VS Code. I needed proper syntax highlighting, IntelliSense-level features, and a robust cursor/selection API that I could hook into for collaboration.
+- **Real-time sync:** Yjs with y-websocket. I initially considered raw Socket.IO for syncing text, but quickly realized that naive "last write wins" breaks down the moment two people type at the same position. Yjs uses CRDTs which guarantee convergence without a central authority deciding who wins.
+- **Backend:** Node.js + Express. It runs three things on a single process: the REST API for room management, a Socket.IO instance (kept from an earlier phase, still used for general signaling), and a raw WebSocket server for Yjs document sync.
+- **Persistence:** LevelDB via y-leveldb. It's an embedded key-value store — no separate database process to manage. Yjs writes document snapshots to disk, so when the server restarts, rooms still have their code.
+
+### Q: How does your project differ from something like CodePen or Replit?
+
+**A:** The biggest differentiator is real-time multi-user collaboration with live cursors. CodePen lets you write code and see output, but there's no concept of "two people editing the same file simultaneously." Replit has collaboration but it's a much larger platform with container-based execution.
+
+My project is more narrowly focused — I wanted to nail the collaborative editing experience specifically. The code execution piece runs entirely client-side in a sandboxed iframe, whereas Replit spins up actual Docker containers on their servers. Mine is simpler but it means zero server cost for execution and instant feedback.
+
+---
+
+## 2. Real-Time Collaboration & CRDTs
+
+### Q: What is a CRDT and why did you need one?
+
+**A:** CRDT stands for Conflict-free Replicated Data Type. It's a data structure that can be modified independently on multiple machines and then merged together without conflicts — the merge always converges to the same result regardless of the order operations arrive.
+
+I needed it because in a collaborative editor, two people might type at the exact same position at the exact same time. If I just sent raw text diffs over WebSocket and applied them naively, you'd get corrupted documents — characters inserted at wrong positions, deletions eating the wrong text.
+
+Yjs implements a sequence CRDT internally. Every character gets a unique ID based on the client ID and a logical clock. When two users insert at the same position, the CRDT has deterministic rules (based on client ID ordering) to decide which character comes first. Both clients apply the same rule, so they always end up with the same document — no central server needed to arbitrate.
+
+### Q: Can you explain how Yjs syncs documents between clients?
+
+**A:** The flow goes like this:
+
+1. When a client joins a room, it creates a local `Y.Doc` and a `WebsocketProvider` that connects to my backend.
+2. On connection, the server sends the client any existing document state it has stored (from LevelDB). The client merges this into its local doc.
+3. When a user types, Monaco fires a change event. The `MonacoBinding` (from y-monaco) translates that into Yjs operations — like "insert character 'a' at position 5 for client #3."
+4. Yjs encodes these operations as a compact binary update and sends it over the WebSocket.
+5. The server receives this update, persists it to LevelDB, and broadcasts it to all other clients in the same room.
+6. Each receiving client decodes the update and applies it to their local Y.Doc. The MonacoBinding then translates the Yjs changes back into Monaco editor operations and applies them to the editor model.
+
+The key insight is that no "diffing" happens. Yjs doesn't send full text snapshots or diffs — it sends lightweight operation logs. And because CRDTs are commutative and idempotent, even if operations arrive out of order or duplicated, the result is always correct.
+
+### Q: What would happen if two users type at exactly the same position at the same time?
+
+**A:** Both insertions would be preserved — no data is lost. Yjs assigns each operation a unique ID composed of the client's unique ID and a lamport timestamp. When two operations target the same position, Yjs has a deterministic tie-breaking rule: it compares client IDs. The client with the lower ID gets placed first. Since every client uses the same tie-breaking logic, all documents converge to the same state.
+
+So if I type "hello" and you type "world" at position 0 simultaneously, we'd both end up seeing either "helloworld" or "worldhello" — the exact order depends on our client IDs, but we'd both agree on the same order.
+
+### Q: Why did you choose Yjs over Operational Transform (OT)?
+
+**A:** OT is what Google Docs uses, and it works, but it requires a central server to serialize and transform operations. If client A and client B both send operations to the server, the server has to transform B's operation against A's before applying it. This means the server is a bottleneck and the algorithm is notoriously hard to implement correctly — there are published papers with bugs in their OT algorithms.
+
+CRDTs like Yjs are peer-to-peer in principle. There's no transformation step. Every operation is self-contained and can be applied in any order. The tradeoff is slightly higher memory usage because each character carries metadata (the unique ID), but for a code editor where documents are typically under 10,000 lines, that overhead is negligible. And frankly, Yjs is battle-tested — it's used by Notion, JupyterLab, and others.
+
+### Q: How do live cursors work? What protocol do you use?
+
+**A:** Yjs ships with an "Awareness" protocol that's separate from the document sync. Every client can broadcast ephemeral state — stuff that doesn't need to be persisted, like cursor position, selection range, and username.
+
+Here's how I wired it up:
+
+1. When your cursor moves in Monaco, the `MonacoBinding` automatically captures the selection anchor and head positions and broadcasts them via `awareness.setLocalStateField()`.
+2. Every other client receives this awareness update. In my `RoomPage.jsx`, I listen for awareness `change` events.
+3. For each remote user, I dynamically inject CSS styles — `.yRemoteSelection-{clientId}` gets a semi-transparent background in that user's color, and `.yRemoteSelectionHead-{clientId}` gets a colored cursor flag with their name.
+4. The MonacoBinding handles the actual decoration rendering in Monaco — it creates `deltaDecorations` that show the colored selection ranges.
+
+Awareness data is intentionally not persisted. If someone disconnects, their cursor disappears within a few seconds because the heartbeat times out.
+
+---
+
+## 3. Architecture & Backend Design
+
+### Q: Walk me through the backend architecture.
+
+**A:** My backend is a single Node.js process that hosts three servers piggybacked on one HTTP server:
+
+1. **Express REST API** — handles room CRUD operations (`POST /api/rooms`, `GET /api/rooms/:id`), health checks, and serves Swagger documentation.
+2. **Socket.IO** — originally used for real-time code sync before I migrated to Yjs. It's still mounted and could be used for features like chat or notifications.
+3. **Yjs WebSocket Server** — a raw `ws` WebSocket server running in "noServer" mode. It handles the Yjs document synchronization protocol.
+
+The trick to running all three on one port is the HTTP `upgrade` event. When a client sends a WebSocket upgrade request, I check the URL path:
+- If it starts with `/yjs`, I route it to the Yjs WebSocket server via `handleUpgrade()`.
+- If it's `/socket.io`, the Socket.IO library automatically handles it (it attaches its own `upgrade` listener internally).
+
+This "merged server" pattern was necessary because Render's free tier only gives you one port per service.
+
+### Q: Why did you merge the Yjs server into the Express server instead of running it separately?
+
+**A:** Locally during development, I ran them as two separate processes — the Express API on port 3001 and the Yjs WebSocket server on port 1234. That worked fine because Vite's dev server proxy forwarded requests to the right place.
+
+But when I deployed to Render, the free tier gives you one port. I couldn't run two separate processes on two ports. So I had to merge them. The cleanest way was to use the `noServer` mode on the `ws` library and intercept the `upgrade` event on the shared HTTP server. The Yjs server never binds its own port — it just says "hand me the socket once the upgrade is complete, and I'll take it from there."
+
+### Q: How does persistence work? What happens when the server restarts?
+
+**A:** Yjs has a LevelDB persistence adapter. On the server side, when `y-websocket` receives document updates, it writes them to a LevelDB database on disk. When a new client connects to a room, the server loads the existing document state from LevelDB and sends it to the client as the initial sync.
+
+For room metadata (creation time, last active), I have a separate `roomStore.js` that reads/writes a simple `rooms.json` file. This is intentionally simple — in production I'd swap it for a proper database, but for this project's scale it works fine.
+
+The tradeoff of LevelDB: it's embedded (no separate DB process), fast for sequential writes, but it doesn't support concurrent access from multiple processes. If I ever needed horizontal scaling, I'd need to swap it for something like Redis or Postgres.
+
+### Q: How did you handle CORS in production?
+
+**A:** This was actually one of the trickiest deployment bugs. When you separate frontend and backend onto different domains (Vercel → `vercel.app`, Backend → `onrender.com`), the browser blocks cross-origin requests by default.
+
+I solved it at two levels:
+1. **HTTP API:** Added the `cors` middleware to Express with `origin: '*'`, which sets the `Access-Control-Allow-Origin` header on every response.
+2. **WebSocket (Socket.IO):** Passed `cors: { origin: '*' }` in the Socket.IO server options.
+3. **WebSocket (Yjs):** Raw WebSocket connections don't have CORS in the traditional sense — the browser doesn't enforce same-origin policy on WebSocket connections. But the initial HTTP upgrade request does have an `Origin` header. Since I'm using `ws` in `noServer` mode, it doesn't check origin by default, so it just works.
+
+In a production environment, I'd tighten `origin: '*'` down to specific domains for security.
+
+---
+
+## 4. Code Execution & Security
+
+### Q: How did you implement code execution in the browser?
+
+**A:** I use a sandboxed iframe. Here's the flow:
+
+1. When the user clicks "Run," I read the editor's current content via `editorRef.current.getValue()`.
+2. I build a complete HTML document as a string. This document contains a `<script>` tag that:
+   - Overrides `console.log`, `console.error`, `console.warn`, and `console.info` to intercept output and forward it to the parent window via `postMessage`.
+   - Wraps the user's code in a `try/catch` to capture runtime errors.
+   - Posts a `{ type: 'complete' }` message when execution finishes.
+3. I create a `Blob` from this HTML string and generate a `blob:` URL using `URL.createObjectURL()`.
+4. I create an invisible `<iframe>` with `sandbox="allow-scripts"` and set its `src` to the blob URL.
+5. The parent window listens for `message` events from the iframe and routes them to the terminal panel.
+6. After 5 seconds, a `setTimeout` fires that kills the iframe — this is my infinite loop protection.
+
+### Q: Why a sandboxed iframe instead of `eval()` or a Web Worker?
+
+**A:** Three options, each with tradeoffs:
+
+**eval():** Runs in the same execution context as my app. A malicious user could do `document.cookie`, access React state, or even modify the DOM. Completely unacceptable from a security standpoint.
+
+**Web Worker:** Runs in a separate thread, which is great for CPU isolation. But Workers don't have access to the DOM, `window`, or many browser APIs. Some valid JavaScript code wouldn't work. Also, you can't easily kill a Web Worker that's stuck in an infinite loop — `worker.terminate()` exists but it's abrupt and doesn't let you capture partial output.
+
+**Sandboxed iframe:** The `sandbox="allow-scripts"` attribute means the iframe can run JavaScript but **cannot** access the parent page's DOM, cookies, localStorage, or anything else. It runs in a completely separate origin (the `blob:` URL). I can kill it by removing it from the DOM, and I can communicate with it safely via `postMessage`. It's the approach that VS Code's webview panels use too.
+
+### Q: What if someone writes an infinite loop?
+
+**A:** The `setTimeout` in `codeRunner.js` handles this. After 5 seconds (configurable via the `timeout` parameter), the cleanup function fires:
+1. It removes the iframe from the DOM, which kills the execution context.
+2. It removes the `message` event listener.
+3. It revokes the blob URL to free memory.
+4. It sends an error message to the terminal: "Execution timed out after 5s (possible infinite loop)."
+
+The user's main app is never affected because the infinite loop runs inside the iframe's separate thread/process (browsers typically run cross-origin iframes in separate processes).
+
+### Q: Could a user break out of the sandbox?
+
+**A:** With `sandbox="allow-scripts"` and without `allow-same-origin`, the iframe is treated as a unique opaque origin. It cannot:
+- Read cookies or localStorage of the parent
+- Access the parent's DOM
+- Make credentialed network requests to my backend
+- Navigate the parent page
+
+The only communication channel is `postMessage`, which I filter by checking `event.source !== iframe.contentWindow` to drop any messages not from my specific iframe.
+
+The theoretical risk is a browser zero-day that bypasses sandboxing, but that's true for every sandboxed execution environment on the web. For a production system handling untrusted code, I'd move execution to a server-side Docker container with resource limits, execution timeouts via cgroups, and network isolation.
+
+---
+
+## 5. Frontend & React Patterns
+
+### Q: How did you manage state in this application? Why not Redux or Zustand?
+
+**A:** I kept it simple with React's built-in hooks — `useState`, `useRef`, `useCallback`, and `useEffect`. The state in this app is mostly local to the `RoomPage` component: which tab is active, what language is selected, cursor position, terminal output, connection status.
+
+The collaborative document state isn't React state at all — it lives in the Yjs `Y.Doc`, which is managed outside of React's lifecycle. The `MonacoBinding` directly mutates the Monaco editor model when remote changes arrive, completely bypassing React's re-render cycle. This is intentional — you don't want React re-rendering the entire component tree every time a character is typed by a remote user.
+
+I use `useRef` for things that need to persist across renders but shouldn't trigger re-renders: the editor instance (`editorRef`), the Yjs room data (`roomRef`), and the user identity (`userRef`).
+
+If the app grew to have features like chat, file trees with server-sync, or user authentication, I'd probably introduce Zustand for global state — it's lighter than Redux and plays well with the pub-sub pattern that Yjs already uses.
+
+### Q: I see you're using `useRef` to store the room data instead of `useState`. Why?
+
+**A:** This was a deliberate choice to avoid a subtle but nasty bug. The `getRoom()` function creates a Yjs document and WebSocket provider the first time it's called for a given room ID — it's essentially a factory with a cache.
+
+If I stored the result in `useState`, React's strict mode (which runs effects twice in development) would call `getRoom()` again on the second mount. The cache would return the same object, which is fine. But on unmount, the cleanup function calls `leaveRoom()`, which destroys the provider and removes it from the cache. Then the second mount would try to use a destroyed provider.
+
+By using `useRef` with a guard check (`if (!roomRef.current || roomRef.current.roomId !== roomId)`), I ensure the room is only created once, and the reference stays stable across re-renders. The cleanup in the `useEffect` return handles disconnection.
+
+### Q: How do you avoid memory leaks with WebSocket connections?
+
+**A:** Multiple layers of cleanup:
+
+1. **Component unmount:** The `useEffect` in `RoomPage.jsx` returns a cleanup function that calls `leaveRoom(roomId)`. This disconnects the WebSocket provider and destroys the Y.Doc.
+2. **Room cache:** `collaboration.js` maintains a `Map` of active rooms. `leaveRoom()` removes the entry from this map after disconnecting.
+3. **Event listeners:** I explicitly call `provider.off('status', handleStatus)` and `awareness.off('change', handleAwarenessChange)` in cleanup functions.
+4. **Blob URLs:** In the code runner, `URL.revokeObjectURL(blobUrl)` frees the blob URL memory after execution.
+5. **Dynamic styles:** The injected `<style>` tag for cursor colors is removed when the component unmounts.
+
+If any of these were missing, you'd see connections piling up in the Network tab or the Yjs server logging "ghost" clients that never disconnect.
+
+### Q: Why Monaco Editor over CodeMirror or Ace?
+
+**A:** Mainly because of the Yjs integration ecosystem. `y-monaco` is a battle-tested binding that handles the bidirectional sync between Yjs documents and Monaco's text model, including cursor awareness. The `y-codemirror` binding exists too, but CodeMirror 6 was still relatively new when I started, and the binding wasn't as polished.
+
+Also, Monaco gives me VS Code's exact theme, keybindings, and feature set — IntelliSense, bracket pair colorization, minimap, multi-cursor support. Since my entire UI is modeled after VS Code, using the same editor engine made the experience feel authentic rather than a knockoff.
+
+The downside is bundle size — Monaco alone contributes ~2.9MB to the JavaScript bundle. For a tool like this, where people spend extended time editing code, I think that's acceptable. But I'd look into lazy-loading Monaco if I ever added a lightweight landing page.
+
+---
+
+## 6. Deployment & DevOps
+
+### Q: Walk me through your deployment architecture.
+
+**A:**
+- **Backend** is on Render (free tier Web Service). It auto-deploys from the `main` branch whenever I push. The root directory is set to `CodeTogetherAPI/`, and Render runs `npm install && node index.js`.
+- **Frontend** is deployed on three platforms:
+  - **Vercel** — connected to GitHub, auto-deploys. Environment variable `VITE_BACKEND_URL` is set in the Vercel dashboard. Vercel runs `npm run build` on their servers, baking the URL into the bundle.
+  - **Firebase Hosting** — manual deploy via `firebase deploy`. The `.env` file on my local machine provides the `VITE_BACKEND_URL` during `npm run build`. I also configured cache headers to prevent stale `index.html` issues.
+  - **Netlify** — connected to GitHub with the `netlify.toml` config for build settings and SPA redirects.
+
+All three frontends talk to the same Render backend.
+
+### Q: You mentioned a caching issue with Firebase. What happened?
+
+**A:** Firebase Hosting by default sets `Cache-Control: max-age=3600` on `index.html`. So when I deployed a new version, users' browsers still served the old cached `index.html` for up to an hour. The old bundle didn't have the production API URL baked in, so the health check would hit `localhost`, fail, and show red status indicators.
+
+On Vercel, they set `Cache-Control: no-cache` on HTML files by default, so new deploys are picked up immediately. That's why Vercel "just worked" while Firebase seemed broken.
+
+The fix was adding explicit cache headers in `firebase.json` to disable caching on `index.html`. Asset files (JS, CSS) are fine to cache because Vite hashes their filenames — a new deploy means new filenames, so old cached assets are never used.
+
+### Q: How do you handle the difference between local development and production URLs?
+
+**A:** Through Vite's environment variable system. Any variable prefixed with `VITE_` in a `.env` file gets replaced at build time by Vite's define plugin.
+
+In development, `VITE_BACKEND_URL` is not set, so `import.meta.env.VITE_BACKEND_URL` is `undefined`. The code falls back to relative paths like `/api/health`, which Vite's dev proxy forwards to `localhost:3001`. For WebSocket, it falls back to `ws://localhost:1234`.
+
+In production, `VITE_BACKEND_URL` is set to the Render URL. The code constructs full URLs like `https://codetogether-kvta.onrender.com/api/health`. For WebSocket, it replaces `https` with `wss` and appends `/yjs`.
+
+This means the same codebase works in both environments without any conditional `if (isDev)` hacks.
+
+### Q: How would you handle the Render "cold start" problem in production?
+
+**A:** Render's free tier spins down after 15 minutes of inactivity. The server takes 20-30 seconds to cold-start. Right now, the first user to visit gets a red status indicator while the server wakes up.
+
+For a real production deployment, I'd either:
+1. **Upgrade to a paid Render plan** — keeps the server always running.
+2. **Add a health-check cron job** — something like UptimeRobot or a GitHub Action that pings the server every 10 minutes to prevent it from sleeping.
+3. **Implement client-side polling** — which I actually built: the health check retries every 3 seconds if failed, so the status automatically turns green once the server wakes up.
+4. **Pre-warm on landing page** — send a fire-and-forget fetch to the API from the Welcome page, so by the time someone clicks "Create Room," the server is already awake.
+
+---
+
+## 7. System Design & Scalability
+
+### Q: How would you scale this to support 10,000 concurrent rooms?
+
+**A:** The current architecture has a single Node.js process handling everything. To scale:
+
+**Backend:**
+1. **Separate the Yjs WebSocket server from the REST API.** The Yjs server is stateful (it holds document state in memory), while the REST API is stateless. Different scaling strategies apply.
+2. **Use Redis as a pub/sub layer between Yjs server instances.** If User A connects to Server 1 and User B connects to Server 2, their updates need to flow between servers. y-redis exists for this exact purpose.
+3. **Replace LevelDB with a shared database** — Postgres or DynamoDB. LevelDB is single-process; you can't have two servers writing to the same LevelDB.
+4. **Add sticky sessions** at the load balancer so WebSocket connections from the same room go to the same server (reduces cross-server communication).
+
+**Frontend:**
+- Already scales infinitely — it's static files served from a CDN (Vercel/Firebase/Netlify).
+
+**Estimated infrastructure for 10K rooms:**
+- 3-5 Yjs WebSocket server instances behind an NGINX load balancer with sticky sessions
+- 2 REST API instances (stateless, easily scaled)
+- Redis cluster for pub/sub
+- Postgres for room metadata and user accounts
+
+### Q: What if two users have different network speeds? How does Yjs handle that?
+
+**A:** Yjs handles this gracefully because of how CRDTs work. Each update is an independent operation that can be applied in any order. If User A has fast internet and types 50 characters before User B's slow connection delivers their first update, it doesn't matter — when B's updates finally arrive, Yjs applies them and the document converges.
+
+Yjs also supports offline editing. If someone loses connection entirely, they can keep typing. When they reconnect, the WebsocketProvider automatically syncs their local changes with the server, and the CRDT merges everything correctly. This is fundamentally different from OT-based systems where you'd get a conflict screen.
+
+### Q: How would you add authentication?
+
+**A:** Right now, users get anonymous identities (random animal names). To add auth:
+
+1. **Frontend:** Add a login page with OAuth (Google/GitHub). Store the JWT in localStorage.
+2. **Backend:** Add authentication middleware to the Express routes. For WebSocket connections, the client would send the JWT as a query parameter during the WebSocket handshake (`wss://...?token=xyz`), and the server would verify it in the `upgrade` handler before accepting the connection.
+3. **Yjs Awareness:** Instead of generating random names, pull the user's real name and avatar from the decoded JWT and broadcast it via awareness.
+4. **Room permissions:** Add an `owner` field to rooms. Only the owner can delete a room or set it as read-only. Other users get the link and join as collaborators.
+
+---
+
+## 8. Future Improvements
+
+### Q: What features would you add next?
+
+**A:**
+
+1. **Multi-language execution** — Right now I only execute JavaScript client-side. For Python, Java, C++, etc., I'd need server-side execution. The approach would be Docker containers with resource limits (CPU, memory, network disabled), using something like Judge0 API or a custom container orchestration system. Each execution would spin up a container, run the code, capture stdout/stderr, and destroy the container.
+
+2. **Multi-file support** — Currently there's one shared `Y.Text` per room. I'd change this to a `Y.Map` where keys are file paths and values are `Y.Text` instances. The file explorer in the sidebar would become functional, allowing users to create, rename, and delete files within a room.
+
+3. **Voice/Video chat** — Add WebRTC via a library like PeerJS. When you're pair programming, you want to talk. I'd add a small video overlay in the corner with push-to-talk or always-on audio.
+
+4. **Git integration** — Let users init a repo, commit, and push to GitHub directly from the editor. This would require a backend service that manages Git operations using `simple-git` or similar.
+
+5. **Permissions & access control** — Room owners can set rooms to "view only" or "invite only." This ties into the authentication system.
+
+6. **Better terminal** — Support for STDIN (user input during execution), ANSI color codes rendering, and maybe even a real shell via `xterm.js` connected to a server-side PTY.
+
+7. **AI code completion** — Integrate an LLM-powered autocomplete. The tricky part is feeding the right context (current file, open files, cursor position) without sending the entire document on every keystroke. I'd debounce requests and use a streaming API for suggestions.
+
+---
+
+## 9. Behavioral / Problem-Solving Questions
+
+### Q: What was the hardest bug you encountered in this project?
+
+**A:** The CORS + deployment debugging was genuinely painful. Everything worked perfectly on localhost because Vite's dev proxy handled cross-origin requests transparently. When I deployed the frontend to Vercel and the backend to Render, the health check started failing silently.
+
+The tricky part was that the WebSocket connection (Yjs) actually worked fine — raw WebSocket upgrades don't go through CORS preflight. But the REST API `/api/health` fetch was blocked because the Express server wasn't sending `Access-Control-Allow-Origin` headers. So I had this confusing state where collaboration worked but the status indicator showed "API: disconnected."
+
+I debugged it by opening the Network tab, seeing the CORS preflight failure, adding the `cors` middleware with `origin: '*'`, redeploying, and the fix worked immediately. The lesson was: always test your deployment pipeline early, not just at the end.
+
+### Q: If you had to rebuild this from scratch, what would you do differently?
+
+**A:** A few things:
+
+1. **Start with the deployment pipeline on day one.** I'd set up CI/CD before writing a single component. Would have caught the CORS issue and environment variable problems way earlier.
+2. **Use TypeScript from the start.** The codebase is pure JavaScript. As it grew, I started losing track of what props each component expects. TypeScript would have caught bugs like passing wrong prop names at compile time.
+3. **Separate the Yjs server from day one.** Merging it into Express was a hack for Render's constraints. If I planned for production from the start, I'd run them as separate services with a proper message queue between them.
+4. **Add integration tests** — Write Playwright tests that open two browser windows, join the same room, type in one, and verify the text appears in the other. Right now I test this manually, which is slow and error-prone.
+
+### Q: How did you approach learning Yjs? It seems like a complex library.
+
+**A:** I started by reading the Yjs docs and the y-websocket README. Then I built the simplest possible prototype: a single HTML file with a `<textarea>` bound to a Y.Text via the y-websocket demo server. Once I saw text syncing between two browser tabs, I understood the mental model.
+
+From there, I layered on complexity: first the Monaco binding (y-monaco), then awareness for cursors, then persistence with LevelDB, then the merged server for deployment. Each layer was a clear, isolated step.
+
+The biggest "aha moment" was realizing that Yjs doesn't diff text — it tracks individual operations. That shifted my mental model from "sync the document state" to "sync the operation log," which made the whole architecture click.
+
+---
+
+## 10. Quick-Fire Technical Questions
+
+### Q: What HTTP status codes does your API return?
+**A:** `200` for successful GET requests (health check, room info), `201` for successful POST (room creation). I could add `404` for rooms that don't exist, `400` for malformed requests, and `429` for rate limiting, but it wasn't needed at this scale.
+
+### Q: What's the difference between `ws` and `wss`?
+**A:** Same as `http` vs `https`. `wss` runs WebSocket over TLS. In production, my Render backend serves over HTTPS, so the WebSocket connection upgrades from HTTPS to WSS. My code does `.replace('https', 'wss')` to construct the correct URL.
+
+### Q: Why `useCallback` on your event handlers?
+**A:** To maintain referential stability. Without `useCallback`, functions like `openFile` and `closeTab` would be recreated on every render. Since they're passed as props to child components, this would cause unnecessary re-renders of those children. `useCallback` memoizes the function so it only changes when its dependencies change.
+
+### Q: What does `sandbox="allow-scripts"` actually do at the browser level?
+**A:** It tells the browser to treat the iframe as a separate, untrusted origin. Without `allow-same-origin` (which I deliberately omit), the iframe gets an opaque origin — meaning it has zero access to the parent's cookies, storage, or DOM. `allow-scripts` just means "yes, you can run JavaScript inside this isolated box." It's the browser's built-in security boundary.
+
+### Q: How does `postMessage` work and is it secure?
+**A:** `postMessage` is the only safe cross-origin communication API in browsers. The sender calls `targetWindow.postMessage(data, targetOrigin)` and the receiver listens for `message` events. Security comes from two places: (1) checking `event.origin` to verify who sent the message, and (2) checking `event.source` to verify which window it came from. In my code, I check `event.source !== iframe.contentWindow` to only accept messages from my specific sandbox iframe. Critically, `postMessage` uses structured clone — you can't pass functions or DOM references, only serializable data.
