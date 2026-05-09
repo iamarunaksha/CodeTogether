@@ -119,7 +119,7 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
     binding._ytextObserver = wrappedObserver;
 
     // =========================================================
-    // FIX 2: Immediate presence visibility
+    // FIX 2: Immediate presence visibility & Cursor Persistence
     // ---------------------------------------------------------
     // When a new user joins, existing users' awareness states
     // may have already synced before MonacoBinding was created.
@@ -127,8 +127,26 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
     // events, so existing cursors are invisible. We force a
     // re-render of decorations + broadcast our own cursor after
     // a short delay to ensure the awareness channel is ready.
+    // We also restore the user's cursor position across refreshes.
     // =========================================================
-    editor.setPosition({ lineNumber: 1, column: 1 });
+    const viewStateKey = 'monaco_view_state_' + window.location.pathname;
+    const savedState = sessionStorage.getItem(viewStateKey);
+    if (savedState) {
+      try {
+        editor.restoreViewState(JSON.parse(savedState));
+      } catch (e) {
+        editor.setPosition({ lineNumber: 1, column: 1 });
+      }
+    } else {
+      editor.setPosition({ lineNumber: 1, column: 1 });
+    }
+
+    const saveStateListener = editor.onDidChangeCursorPosition(() => {
+      const state = editor.saveViewState();
+      if (state) {
+        sessionStorage.setItem(viewStateKey, JSON.stringify(state));
+      }
+    });
 
     // Repeatedly try to render remote decorations until awareness syncs
     let presenceAttempts = 0;
@@ -151,7 +169,7 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
         binding._rerenderDecorations();
       }
 
-      // Stop after 3 seconds (6 attempts × 500ms)
+    // Stop after 3 seconds (6 attempts × 500ms)
       if (presenceAttempts >= 6) {
         clearInterval(presenceTimer);
       }
@@ -161,6 +179,7 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
     cleanupRef.current = () => {
       clearInterval(presenceTimer);
       doc.off('beforeAllTransactions', saveCursor);
+      saveStateListener.dispose();
     };
 
     // Pass editor instance to parent for cursor tracking
@@ -191,7 +210,8 @@ function CodeEditor({ language = 'javascript', onMount, yText, provider }) {
         cursorSmoothCaretAnimation: 'on',
         smoothScrolling: true,
         bracketPairColorization: { enabled: true },
-        padding: { top: 28 },
+        padding: { top: 16 },
+        fixedOverflowWidgets: true,
       }}
     />
   );
